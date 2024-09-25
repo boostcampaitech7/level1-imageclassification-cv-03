@@ -67,15 +67,72 @@ class AlbumentationsTransform:
         
         return transformed['image']  # 변환된 이미지의 텐서를 반환
 
+class AlbumentationsTransform2:
+    def __init__(self, model_name: str, is_train: bool = True):
+        model = timm.create_model(model_name, pretrained=True, num_classes=500)
+        model_cfg = model.default_cfg
+        # 공통 변환 설정: 이미지 리사이즈, 정규화, 텐서 변환
+        common_transforms = [
+            A.Resize(model_cfg['input_size'][1], model_cfg['input_size'][2]),
+            A.Normalize(mean=model_cfg['mean'], std=model_cfg['std']),  # 정규화
+            ToTensorV2()  # albumentations에서 제공하는 PyTorch 텐서 변환
+        ]
+        
+        if is_train:
+            # 훈련용 변환: 랜덤 수평 뒤집기, 랜덤 회전, 랜덤 밝기 및 대비 조정 추가
+            self.transform = A.Compose(
+                [
+                    # 플립 및 회전
+                    A.HorizontalFlip(p=0.4),
+                    # A.VerticalFlip(p=0.3),
+                    # A.RandomRotate90(p=0.5),
+                    A.Rotate(limit=15, p=0.7),
+                    
+                    # 이동 및 스케일 조정
+                    # A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5),
+                    # A.RandomResizedCrop(height=224, width=224, scale=(0.8, 1.0), ratio=(0.9, 1.1), p=0.5),
+                    
+                    # Geometric transformations
+                    # A.Affine(scale=(0.8, 1.2), shear=(-10, 10), p=0.5),
+                    # A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.5),
+                    # A.GridDistortion(num_steps=5, distort_limit=0.3, p=0.5),
+                    # A.OpticalDistortion(distort_limit=0.5, shift_limit=0.5, p=0.5),
+                    
+                    # Noise and blur
+                    # A.GaussNoise(blur_limit=(3, 5), p=0.15),
+                    # A.MotionBlur(blur_limit=(3, 7), p=0.5),
+                    
+                    # 색상 변화
+                    A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
+                    
+                    # Sketch-specific augmentations
+                    # A.CoarseDropout(max_holes=8, max_height=16, max_width=16, fill_value=255, p=0.5),
+                ] + common_transforms
+            )
+        else:
+            # 검증/테스트용 변환: 공통 변환만 적용
+            self.transform = A.Compose(common_transforms)
+
+    def __call__(self, image) -> torch.Tensor:
+        # 이미지가 NumPy 배열인지 확인
+        if not isinstance(image, np.ndarray):
+            raise TypeError("Image should be a NumPy array (OpenCV format).")
+        
+        # 이미지에 변환 적용 및 결과 반환
+        transformed = self.transform(image=image)  # 이미지에 설정된 변환을 적용
+        
+        return transformed['image']  # 변환된 이미지의 텐서를 반환
+
 class TransformSelector:
     """
     이미지 변환 라이브러리를 선택하기 위한 클래스.
     """
-    def __init__(self, transform_type: str):
+    def __init__(self, transform_type: str, model_name: str="convnext_tiny"):
 
         # 지원하는 변환 라이브러리인지 확인
-        if transform_type in ["torchvision", "albumentations"]:
+        if transform_type in ["torchvision", "albumentations", "albumentations2"]:
             self.transform_type = transform_type
+            self.model_name = model_name
         
         else:
             raise ValueError("Unknown transformation library specified.")
@@ -88,5 +145,8 @@ class TransformSelector:
         
         elif self.transform_type == 'albumentations':
             transform = AlbumentationsTransform(is_train=is_train)
+        
+        elif self.transform_type == 'albumentations2':
+            transform = AlbumentationsTransform2(model_name=self.model_name, is_train=is_train)
         
         return transform

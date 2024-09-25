@@ -39,3 +39,69 @@ class CustomDataset(Dataset):
         else:
             target = self.targets[index]  # 해당 이미지의 레이블
             return image, target  # 변환된 이미지와 레이블을 튜플 형태로 반환합니다. 
+
+class CustomDatasetPad(Dataset):
+    def __init__(
+        self, 
+        root_dir: str, 
+        info_df: pd.DataFrame, 
+        transform: Callable,
+        is_inference: bool = False
+    ):
+        self.root_dir = root_dir  # 이미지 파일들이 저장된 기본 디렉토리
+        self.transform = transform  # 이미지에 적용될 변환 처리
+        self.is_inference = is_inference  # 추론 모드 여부
+        self.image_paths = info_df['image_path'].tolist()  # 이미지 파일 경로 목록
+        
+        if not self.is_inference:
+            self.targets = info_df['target'].tolist()  # 각 이미지의 레이블 목록
+
+    def __len__(self) -> int:
+        return len(self.image_paths)
+
+    def __getitem__(self, index: int) -> Union[Tuple[torch.Tensor, int], torch.Tensor]:
+        img_path = os.path.join(self.root_dir, self.image_paths[index])  # 이미지 경로
+        image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # 이미지를 GRAY로 로드
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)  # RGB로 변환
+
+        # 가로 또는 세로 중 긴 쪽에 맞춰 패딩을 추가하여 1:1 비율로 만듦
+        image = self.pad_to_square(image)
+        
+        # 설정된 이미지 변환을 적용
+        image = self.transform(image)
+
+        if self.is_inference:
+            return image
+        else:
+            target = self.targets[index]  # 해당 이미지의 레이블
+            return image, target
+
+    def pad_to_square(self, image: np.ndarray) -> np.ndarray:
+        """긴 쪽에 맞춰 짧은 쪽에 패딩을 추가하여 이미지를 1:1 비율로 만듦"""
+        height, width, _ = image.shape
+        if height == width:
+            return image  # 이미 1:1 비율이면 그대로 반환
+
+        # 긴 쪽 길이에 맞춰 짧은 쪽에 패딩 추가
+        if (height / width) > 1.5:
+            padding = (height - width) // 3
+            # 검은색 패딩
+            # image = cv2.copyMakeBorder(image, 0, 0, padding, padding, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+            
+            # 흰색 패딩
+            image = cv2.copyMakeBorder(image, 0, 0, padding, padding, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+            
+            # 근처 색깔로 패딩
+            # image = cv2.copyMakeBorder(image, 0, 0, padding, padding, borderType=cv2.BORDER_REPLICATE)
+        elif (width / height) > 1.5:
+            padding = (width - height) // 3
+            # 검은색 패딩
+            # image = cv2.copyMakeBorder(image, padding, padding, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+            
+            # 흰색 패딩
+            image = cv2.copyMakeBorder(image, padding, padding, 0, 0, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+            
+            # 근처 색깔로 패딩
+            # image = cv2.copyMakeBorder(image, padding, padding, 0, 0, borderType=cv2.BORDER_REPLICATE)
+        
+        return image

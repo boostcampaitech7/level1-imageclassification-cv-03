@@ -73,55 +73,64 @@ def main():
         shuffle=False
     )
     
-    # 학습에 사용할 Model을 선언.
+    # 학습에 사용할 장비를 선택
+    # torch라이브러리에서 gpu를 인식할 경우, cuda로 설정
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
+
+    # validation까지 학습
+    # 학습된 모델을 불러오기 (저장된 가중치 로드)
     model_selector = ModelSelector(
-        model_type=model_type, 
-        num_classes=num_classes,
-        model_name=model_name, 
-        pretrained=True
+        model_type='timm',
+        num_classes=num_classes, 
+        model_name='convnext_large',
+        pretrained=False
     )
     model = model_selector.get_model()
-    
-    # 선언된 모델을 학습에 사용할 장비로 셋팅.
-    model.to(device)
+    model.load_state_dict(torch.load('/data/ephemeral/home/data/ensemble/best_convnext_large_8880.pt'))
+    model = model.to(device)
+
+    # Train과 Validation 데이터를 합쳐서 새로운 DataLoader 생성
+    full_dataset = torch.utils.data.ConcatDataset([train_dataset, val_dataset])
+    full_loader = DataLoader(full_dataset, batch_size=32, shuffle=True)
     
     # 학습에 사용할 optimizer를 선언하고, learning rate를 지정
     optimizer = optim.Adam(
         model.parameters(), 
-        lr=learning_rate
+        lr=1e-5
     )
     
     # 스케줄러 초기화
-    scheduler_step_size = scheduler_step_size  # 매 30step마다 학습률 감소
-    scheduler_gamma = scheduler_gamma  # 학습률을 현재의 10%로 감소
-    
+    scheduler_step_size = 30  # 매 30step마다 학습률 감소
+    scheduler_gamma = 0.15  # 학습률을 현재의 15%로 감소
+
     # 한 epoch당 step 수 계산
     steps_per_epoch = len(train_loader)
-    
+
     # 2 epoch마다 학습률을 감소시키는 스케줄러 선언
-    epochs_per_lr_decay = epochs_per_lr_decay
+    epochs_per_lr_decay = 2
     scheduler_step_size = steps_per_epoch * epochs_per_lr_decay
-    
+
     scheduler = optim.lr_scheduler.StepLR(
-        optimizer, 
+        optimizer,
         step_size=scheduler_step_size, 
         gamma=scheduler_gamma
     )
-    
+
     # 학습에 사용할 Loss를 선언.
     loss_fn = Loss()
     
     # 앞서 선언한 필요 class와 변수들을 조합해, 학습을 진행할 Trainer를 선언. 
     trainer = Trainer(
-        model=model, 
-        device=device, 
-        train_loader=train_loader,
-        val_loader=val_loader, 
+        model=model,  # 학습된 모델을 사용
+        device=device,
+        train_loader=full_loader,  # 합친 전체 데이터로 학습
+        val_loader=None,  # validation은 없으므로 None
         optimizer=optimizer,
         scheduler=scheduler,
-        loss_fn=loss_fn, 
-        epochs=epochs,
-        result_path=save_result_path
+        loss_fn=loss_fn,
+        epochs=20,  # 추가 학습할 에폭 수 설정
+        result_path="/data/ephemeral/home/data/full_result"
     )
     
     # 모델 학습.
