@@ -1,11 +1,13 @@
 # 학습 데이터의 경로와 정보를 가진 파일의 경로를 설정.
-traindata_dir = "./data/train"
-traindata_info_file = "./data/train.csv"
-save_result_path = "./train_result"
+traindata_dir = "/data/ephemeral/home/data/train"
+traindata_info_file = "/data/ephemeral/home/data/train.csv"
+save_result_path = "/data/ephemeral/home/data/result"
 
-testdata_dir = "./data/test"
-testdata_info_file = "./data/test.csv"
-save_result_path = "./train_result"
+# 추론 데이터의 경로와 정보를 가진 파일의 경로를 설정.
+testdata_dir = "/data/ephemeral/home/data/test"
+testdata_info_file = "/data/ephemeral/home/data/test.csv"
+save_result_path = "/data/ephemeral/home/data/result"
+save_ensemble_path = "/data/ephemeral/home/data/ensemble"
 
 batch_size = 64
 learning_rate = 1e-4

@@ -5,6 +5,96 @@ import torch.optim as optim
 from tqdm.auto import tqdm
 from torch.utils.data import DataLoader, Dataset
 
+# label smoothing
+"""
+label을 0 또는 1이 아니라 smooth하게 부여
+효과
+ - 오버피팅 방지
+ - calibration, regularization
+"""
+class LabelSmoothingLoss(nn.Module): 
+    def __init__(self, classes=5, smoothing=0.0, dim=-1): 
+        super(LabelSmoothingLoss, self).__init__() 
+        self.confidence = 1.0 - smoothing 
+        self.smoothing = smoothing 
+        self.cls = classes 
+        self.dim = dim 
+    def forward(self, pred, target): 
+        pred = pred.log_softmax(dim=self.dim) 
+        with torch.no_grad():
+            true_dist = torch.zeros_like(pred) 
+            true_dist.fill_(self.smoothing / (self.cls - 1)) 
+            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence) 
+        return torch.mean(torch.sum(-true_dist * pred, dim=self.dim))
+
+# focal loss
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=2, reduce=True):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduce = reduce
+
+    def forward(self, inputs, targets):
+        BCE_loss = nn.CrossEntropyLoss()(inputs, targets)
+
+        pt = torch.exp(-BCE_loss)
+        F_loss = self.alpha * (1-pt)**self.gamma * BCE_loss
+
+        if self.reduce:
+            return torch.mean(F_loss)
+        else:
+            return F_loss
+
+# FocalCosineLoss
+class FocalCosineLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=2, xent=.1):
+        super(FocalCosineLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+        self.xent = xent
+
+        self.y = torch.Tensor([1]).cuda()
+
+    def forward(self, input, target, reduction="mean"):
+        cosine_loss = F.cosine_embedding_loss(input, F.one_hot(target, num_classes=input.size(-1)), self.y, reduction=reduction)
+
+        cent_loss = F.cross_entropy(F.normalize(input), target, reduce=False)
+        pt = torch.exp(-cent_loss)
+        focal_loss = self.alpha * (1-pt)**self.gamma * cent_loss
+
+        if reduction == "mean":
+            focal_loss = torch.mean(focal_loss)
+
+        return cosine_loss + self.xent * focal_loss
+
+'''
+class Loss(nn.Module):
+    """
+    모델의 손실함수를 계산하는 클래스.
+    """
+    def __init__(self, loss_type='cross_entropy'):
+        super(Loss, self).__init__()
+        if loss_type == 'cosine':
+            self.loss_fn = nn.CosineEmbeddingLoss()
+        else:
+            self.loss_fn = nn.CrossEntropyLoss()
+
+    def forward(
+        self, 
+        outputs: torch.Tensor, 
+        targets: torch.Tensor
+    ) -> torch.Tensor:
+        if isinstance(self.loss_fn, nn.CosineEmbeddingLoss):
+            targets_one_hot = torch.nn.functional.one_hot(targets, num_classes=outputs.size(1)).float()
+            targets_cosine = torch.ones(outputs.size(0)).to(outputs.device)  # 코사인 손실을 위해 타겟을 1로 설정
+            return self.loss_fn(outputs, targets_one_hot, targets_cosine)
+        else:
+            return self.loss_fn(outputs, targets)
+'''
+
+
 class Loss(nn.Module):
     """
     모델의 손실함수를 계산하는 클래스.

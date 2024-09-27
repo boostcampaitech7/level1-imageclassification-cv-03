@@ -136,5 +136,5 @@ def main():
     # 모델 학습.
     trainer.train()
 
-if __name__ == "__train__": # python train.py
+if __name__ == "__all_train__": # python all_train.py
     main()

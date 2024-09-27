@@ -3,7 +3,7 @@ from config import *
 from dataset import CustomDataset
 from transform import TransformSelector
 from model import ModelSelector
-from trainer import Loss, Trainer
+from trainer import Loss, Trainer, LabelSmoothingLoss, FocalLoss, FocalCosineLoss
 
 import random
 import torch
