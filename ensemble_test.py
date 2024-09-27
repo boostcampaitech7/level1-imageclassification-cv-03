@@ -4,6 +4,7 @@ from transform import TransformSelector
 from model import ModelSelector
 
 import os
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -25,7 +26,7 @@ def inference_ensemble(
         model_probs = []
         
         with torch.no_grad():  # Gradient 계산을 비활성화
-            for images in tqdm(test_loader):
+            for images in tqdm(loader):
                 # 데이터를 같은 장치로 이동
                 images = images.to(device)
                 
