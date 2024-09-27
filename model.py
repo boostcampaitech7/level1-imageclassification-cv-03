@@ -88,13 +88,17 @@ class ModelSelector:
     ):
         
         # 모델 유형에 따라 적절한 모델 객체를 생성
+        
         if model_type == 'simple':
             self.model = SimpleCNN(num_classes=num_classes)
         
         elif model_type == 'torchvision':
             self.model = TorchvisionModel(num_classes=num_classes, **kwargs)
         
-        elif model_type == 'timm':
+        if model_type == 'timm':
+            self.model = TimmModel(num_classes=num_classes, **kwargs)
+        
+        elif model_type == 'load_model':
             self.model = TimmModel(num_classes=num_classes, **kwargs)
         
         else:

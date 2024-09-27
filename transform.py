@@ -1,4 +1,5 @@
 import torch
+import timm
 import numpy as np
 from PIL import Image
 import albumentations as A
@@ -67,8 +68,10 @@ class AlbumentationsTransform:
         
         return transformed['image']  # 변환된 이미지의 텐서를 반환
 
+# 여러 실험을 위한 Transform
 class AlbumentationsTransform2:
     def __init__(self, model_name: str, is_train: bool = True):
+        # 앙상블을 위해 각 모델 configuration 불러오기
         model = timm.create_model(model_name, pretrained=True, num_classes=500)
         model_cfg = model.default_cfg
         # 공통 변환 설정: 이미지 리사이즈, 정규화, 텐서 변환
@@ -82,30 +85,24 @@ class AlbumentationsTransform2:
             # 훈련용 변환: 랜덤 수평 뒤집기, 랜덤 회전, 랜덤 밝기 및 대비 조정 추가
             self.transform = A.Compose(
                 [
-                    # 플립 및 회전
                     A.HorizontalFlip(p=0.4),
                     # A.VerticalFlip(p=0.3),
                     # A.RandomRotate90(p=0.5),
                     A.Rotate(limit=15, p=0.7),
                     
-                    # 이동 및 스케일 조정
                     # A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, p=0.5),
                     # A.RandomResizedCrop(height=224, width=224, scale=(0.8, 1.0), ratio=(0.9, 1.1), p=0.5),
                     
-                    # Geometric transformations
                     # A.Affine(scale=(0.8, 1.2), shear=(-10, 10), p=0.5),
                     # A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.5),
                     # A.GridDistortion(num_steps=5, distort_limit=0.3, p=0.5),
                     # A.OpticalDistortion(distort_limit=0.5, shift_limit=0.5, p=0.5),
                     
-                    # Noise and blur
                     # A.GaussNoise(blur_limit=(3, 5), p=0.15),
                     # A.MotionBlur(blur_limit=(3, 7), p=0.5),
                     
-                    # 색상 변화
                     A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
                     
-                    # Sketch-specific augmentations
                     # A.CoarseDropout(max_holes=8, max_height=16, max_width=16, fill_value=255, p=0.5),
                 ] + common_transforms
             )
@@ -123,14 +120,83 @@ class AlbumentationsTransform2:
         
         return transformed['image']  # 변환된 이미지의 텐서를 반환
 
+# TTA를 위한 Transfrom1
+class TTAlbumTrans1:
+    def __init__(self, model_name: str, is_train: bool = False):
+        model = timm.create_model(model_name, pretrained=True, num_classes=500)
+        model_cfg = model.default_cfg
+        # 공통 변환 설정: 이미지 리사이즈, 정규화, 텐서 변환
+        self.transform = [
+            A.Resize(model_cfg['input_size'][1], model_cfg['input_size'][2]),
+            A.Normalize(mean=model_cfg['mean'], std=model_cfg['std']),  # 정규화
+            A.HorizontalFlip(p=1),
+            ToTensorV2()  # albumentations에서 제공하는 PyTorch 텐서 변환
+        ]
+
+    def __call__(self, image) -> torch.Tensor:
+        # 이미지가 NumPy 배열인지 확인
+        if not isinstance(image, np.ndarray):
+            raise TypeError("Image should be a NumPy array (OpenCV format).")
+        
+        # 이미지에 변환 적용 및 결과 반환
+        transformed = self.transform(image=image)  # 이미지에 설정된 변환을 적용
+        
+        return transformed['image']  # 변환된 이미지의 텐서를 반환
+
+# TTA를 위한 Transfrom1
+class TTAlbumTrans2:
+    def __init__(self, model_name: str, is_train: bool = False):
+        model = timm.create_model(model_name, pretrained=True, num_classes=500)
+        model_cfg = model.default_cfg
+        # 공통 변환 설정: 이미지 리사이즈, 정규화, 텐서 변환
+        self.transform = [
+            A.Resize(model_cfg['input_size'][1], model_cfg['input_size'][2]),
+            A.Normalize(mean=model_cfg['mean'], std=model_cfg['std']),  # 정규화
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=1),
+            ToTensorV2()  # albumentations에서 제공하는 PyTorch 텐서 변환
+        ]
+
+    def __call__(self, image) -> torch.Tensor:
+        # 이미지가 NumPy 배열인지 확인
+        if not isinstance(image, np.ndarray):
+            raise TypeError("Image should be a NumPy array (OpenCV format).")
+        
+        # 이미지에 변환 적용 및 결과 반환
+        transformed = self.transform(image=image)  # 이미지에 설정된 변환을 적용
+        
+        return transformed['image']  # 변환된 이미지의 텐서를 반환
+
+# TTA를 위한 Transfrom1
+class TTAlbumTrans3:
+    def __init__(self, model_name: str, is_train: bool = False):
+        model = timm.create_model(model_name, pretrained=True, num_classes=500)
+        model_cfg = model.default_cfg
+        # 공통 변환 설정: 이미지 리사이즈, 정규화, 텐서 변환
+        self.transform = [
+            A.Resize(model_cfg['input_size'][1], model_cfg['input_size'][2]),
+            A.Normalize(mean=model_cfg['mean'], std=model_cfg['std']),  # 정규화
+            A.Rotate(limit=20, p=1),
+            ToTensorV2()  # albumentations에서 제공하는 PyTorch 텐서 변환
+        ]
+
+    def __call__(self, image) -> torch.Tensor:
+        # 이미지가 NumPy 배열인지 확인
+        if not isinstance(image, np.ndarray):
+            raise TypeError("Image should be a NumPy array (OpenCV format).")
+        
+        # 이미지에 변환 적용 및 결과 반환
+        transformed = self.transform(image=image)  # 이미지에 설정된 변환을 적용
+        
+        return transformed['image']  # 변환된 이미지의 텐서를 반환
+
 class TransformSelector:
     """
     이미지 변환 라이브러리를 선택하기 위한 클래스.
     """
-    def __init__(self, transform_type: str, model_name: str="convnext_tiny"):
+    def __init__(self, transform_type: str, model_name: str=None):
 
         # 지원하는 변환 라이브러리인지 확인
-        if transform_type in ["torchvision", "albumentations", "albumentations2"]:
+        if transform_type in ["torchvision", "albumentations", "albumentations2", "tta1", "tta2", "tta3"]:
             self.transform_type = transform_type
             self.model_name = model_name
         
@@ -148,5 +214,14 @@ class TransformSelector:
         
         elif self.transform_type == 'albumentations2':
             transform = AlbumentationsTransform2(model_name=self.model_name, is_train=is_train)
+        
+        elif self.transform_type == 'tta1':
+            transform = TTAlbumTrans1(model_name=self.model_name, is_train=is_train)
+        
+        elif self.transform_type == 'tta2':
+            transform = TTAlbumTrans2(model_name=self.model_name, is_train=is_train)
+        
+        elif self.transform_type == 'tta3':
+            transform = TTAlbumTrans3(model_name=self.model_name, is_train=is_train)
         
         return transform
